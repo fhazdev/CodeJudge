@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CodeJudge.Domain\CodeJudge.Domain.csproj" />
+    <ProjectReference Include="..\CodeJudge.Application\CodeJudge.Application.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,14 @@
 <Solution>
   <Folder Name="/apps/" />
   <Folder Name="/apps/api/">
+    <Project Path="apps/api/CodeJudge.Api/CodeJudge.Api.csproj" />
+    <Project Path="apps/api/CodeJudge.Application/CodeJudge.Application.csproj" />
     <Project Path="apps/api/CodeJudge.Domain/CodeJudge.Domain.csproj" />
     <Project Path="apps/api/CodeJudge.Infrastructure/CodeJudge.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/apps/api/tests/">
+    <Project Path="apps/api/tests/CodeJudge.Api.IntegrationTests/CodeJudge.Api.IntegrationTests.csproj" />
+    <Project Path="apps/api/tests/CodeJudge.Application.Tests/CodeJudge.Application.Tests.csproj" />
   </Folder>
   <Folder Name="/apps/judge/">
     <Project Path="apps/judge/CodeJudge.Judge.Runner/CodeJudge.Judge.Runner.csproj" />

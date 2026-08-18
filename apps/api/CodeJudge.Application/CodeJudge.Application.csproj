@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Application depends on Domain and on abstractions only. No EF Core, no Npgsql, no
+    ASP.NET Core. If one of those is ever needed here, the thing that needs it belongs
+    in Infrastructure or Api instead.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodeJudge.Domain\CodeJudge.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

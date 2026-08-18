@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>CodeJudge.Api</RootNamespace>
+    <UserSecretsId>codejudge-api</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Identity.Web" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MediatR" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodeJudge.Application\CodeJudge.Application.csproj" />
+    <ProjectReference Include="..\CodeJudge.Infrastructure\CodeJudge.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

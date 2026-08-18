@@ -1,0 +1,20 @@
+# Normalize to LF in the repository. CI builds on ubuntu-latest, and CRLF in shell
+# scripts or Dockerfiles fails there in ways that are irritating to diagnose.
+* text=auto eol=lf
+
+# Files that must be LF regardless of platform.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+
+# Windows-only tooling.
+*.ps1       text eol=crlf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+
+# Binary.
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.woff2     binary
