@@ -1,0 +1,35 @@
+name: codejudge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: codejudge-postgres
+    environment:
+      POSTGRES_USER: codejudge
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: codejudge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codejudge -d codejudge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Storage Queue emulator. Unused in phase 0, wired up in phase 2.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: codejudge-azurite
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck"
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - azurite-data:/data
+
+volumes:
+  postgres-data:
+  azurite-data:

@@ -1,0 +1,30 @@
+<Project>
+
+  <!--
+    The judge spawns CodeJudge.Judge.Runner as a child process, so the runner's build
+    output has to sit next to whatever is doing the spawning. That is true for both
+    CodeJudge.Judge and CodeJudge.Judge.Tests, hence a shared targets file rather than
+    duplicated MSBuild in each csproj.
+
+    ReferenceOutputAssembly=false: we want the runner *built* and *copied*, but we must
+    not link against it. The child process is a trust boundary; the parent should have
+    no compile-time knowledge of it beyond a path.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)CodeJudge.Judge.Runner\CodeJudge.Judge.Runner.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="CopyJudgeRunner" AfterTargets="Build">
+    <ItemGroup>
+      <!-- Evaluated at execution time, after the ProjectReference above has built. -->
+      <_JudgeRunnerFiles Include="$(MSBuildThisFileDirectory)CodeJudge.Judge.Runner\bin\$(Configuration)\$(TargetFramework)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_JudgeRunnerFiles)"
+          DestinationFolder="$(OutDir)runner\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

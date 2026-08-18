@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/api/">
+    <Project Path="apps/api/CodeJudge.Domain/CodeJudge.Domain.csproj" />
+    <Project Path="apps/api/CodeJudge.Infrastructure/CodeJudge.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/apps/judge/">
+    <Project Path="apps/judge/CodeJudge.Judge.Runner/CodeJudge.Judge.Runner.csproj" />
+    <Project Path="apps/judge/CodeJudge.Judge/CodeJudge.Judge.csproj" />
+  </Folder>
+  <Folder Name="/apps/judge/tests/">
+    <Project Path="apps/judge/tests/CodeJudge.Judge.Tests/CodeJudge.Judge.Tests.csproj" />
+  </Folder>
+</Solution>

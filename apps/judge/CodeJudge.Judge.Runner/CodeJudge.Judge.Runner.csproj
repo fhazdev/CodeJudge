@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deliberately dependency-free. This process hosts untrusted code, so the less that is
+    loaded into it, the smaller the surface a submission can reach. No EF Core, no Azure
+    SDK, no database connection string anywhere in its environment.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CodeJudge.Judge.Runner</AssemblyName>
+    <RootNamespace>CodeJudge.Judge.Runner</RootNamespace>
+  </PropertyGroup>
+
+</Project>

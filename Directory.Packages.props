@@ -1,0 +1,55 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Roslyn">
+    <!--
+      The compiler-as-a-library that turns a submission into a runnable assembly.
+
+      Pinned to 5.0.0 rather than the newest 5.9.0 on purpose: EF Core's design-time
+      package depends on Microsoft.CodeAnalysis.CSharp.Workspaces 5.0.0, which has an
+      exact-version dependency on this. With transitive pinning on, taking 5.9.0 here
+      forces it into EF's graph and restore fails with NU1107. Nothing in the judge needs
+      a newer Roslyn than the one the SDK band already ships.
+    -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Data">
+    <!--
+      The EF Core trio is pinned explicitly. Npgsql 10.0.3 asks for EF Core >= 10.0.4
+      while the Design package carries 10.0.11, and without these pins the judge binds
+      against 10.0.4 while Infrastructure compiles against 10.0.11, which fails at
+      CS1705. Both constraints are lower bounds, so unifying upward is safe.
+    -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup Label="Hosting">
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <!--
+      xUnit v3 (D9). v3 projects are executables that host Microsoft.Testing.Platform
+      directly. The .NET 10 SDK dropped the VSTest bridge, so Microsoft.NET.Test.Sdk,
+      xunit.runner.visualstudio and coverlet.collector are all deliberately absent:
+      including any of them re-engages VSTest and `dotnet test` fails outright.
+      Coverage comes from the MTP extension below instead of coverlet.
+    -->
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.10.0" />
+    <!-- Shouldly over FluentAssertions: MIT, no commercial licence question (section 8). -->
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <!-- NSubstitute over Moq: no SponsorLink history (section 8). -->
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+  </ItemGroup>
+
+</Project>

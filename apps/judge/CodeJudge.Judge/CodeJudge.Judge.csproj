@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CodeJudge.Judge</AssemblyName>
+    <RootNamespace>CodeJudge.Judge</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <!--
+      `dotnet ef` requires this on the *startup* project, and Infrastructure marks it
+      PrivateAssets=all so it does not flow through the project reference. Design-time
+      only: it contributes nothing to the published image.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\api\CodeJudge.Domain\CodeJudge.Domain.csproj" />
+    <ProjectReference Include="..\..\api\CodeJudge.Infrastructure\CodeJudge.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Runner.targets" />
+
+</Project>

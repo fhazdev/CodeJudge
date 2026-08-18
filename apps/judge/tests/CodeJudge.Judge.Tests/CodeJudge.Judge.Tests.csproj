@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>CodeJudge.Judge.Tests</RootNamespace>
+    <!--
+      No TestingPlatformDotnetTestSupport here. That property is the legacy bridge that
+      runs MTP projects under VSTest mode, which the .NET 10 SDK refuses. MTP mode is
+      opted into once, in global.json, via "test": { "runner": "Microsoft.Testing.Platform" }.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeJudge.Judge\CodeJudge.Judge.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+  </ItemGroup>
+
+  <!--
+    Submission fixtures are real .cs files rather than string literals, so they stay
+    readable and syntax-highlighted. They must NOT be compiled into this assembly:
+    several of them do not compile on purpose.
+  -->
+  <ItemGroup>
+    <Compile Remove="Fixtures\**\*.cs" />
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Import Project="..\..\Runner.targets" />
+
+</Project>
