@@ -70,6 +70,7 @@
     -->
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.10.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.3.3" />
     <!-- Shouldly over FluentAssertions: MIT, no commercial licence question (section 8). -->
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <!-- NSubstitute over Moq: no SponsorLink history (section 8). -->

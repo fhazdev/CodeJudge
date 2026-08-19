@@ -462,12 +462,13 @@ Also added beyond the checklist: an environment scrub on the child process (the 
 - [x] API: MediatR + Clean Architecture skeleton, `Microsoft.Identity.Web`, problems endpoints
 - [x] Web: Vite + React + TS, MSAL sign-in, problem list, Monaco on the detail page
 - [x] **Sign-in verified end to end against real Entra.** The risk-table item is closed
+- [x] API Dockerfile, verified: 106 MB, non-root uid 1654, health 200, 401 unauthenticated
+- [x] `infra/bootstrap/bootstrap.ps1`: state RG, storage account, container, CI role assignment
+- [x] Terraform platform module: RG, Log Analytics, Container Apps environment, storage + queue, Key Vault, UAMI, Container App, Static Web App. Written and validated, **not applied**
+- [x] `ci-dotnet.yml`, `ci-web.yml`, `cd-infra.yml`, every command verified locally
 - [ ] Verify with a **second, unrelated** Microsoft account, not the subscription owner
-- [ ] API Dockerfile
-- [ ] `infra/bootstrap/bootstrap.ps1`: state RG, storage account, container, GitHub OIDC app
-- [ ] Terraform platform module: RG, Log Analytics, Container Apps environment, storage + queue, Key Vault, UAMI, Static Web App
 - [ ] Neon project created, connection string into Key Vault
-- [ ] `ci-api.yml`, `ci-web.yml`, `cd-infra.yml` (plan on PR, apply on main)
+- [ ] Run bootstrap, uncomment the backend, `terraform apply`
 
 **Exit criterion:** signed in with a personal Microsoft account on the deployed SWA, seeing the problem list from the live API. Met locally; the deployed half waits on the platform module.
 
@@ -480,6 +481,17 @@ Also added beyond the checklist: an environment scrub on the child process (the 
 | Enum serialization unconsidered | `JsonStringEnumConverter` | Writing the TypeScript types surfaced that the API was sending `"difficulty": 0`. Every client would have hardcoded ordinals, and inserting an enum value later would silently reinterpret stored responses |
 
 Three Entra constraints that cost a plan/apply cycle each, now encoded in the Terraform: root redirect URIs require a trailing slash; **every** registration allowing personal accounts must request v2 tokens, including the SPA that exposes no scopes; and the identifier URI needs a separate resource because it embeds the client id that does not exist until after creation.
+
+Later in the phase, four more:
+
+| Planned | Built | Why |
+|---|---|---|
+| `ci-api.yml` and `ci-judge.yml` | One `ci-dotnet.yml` | They are one solution. Splitting them means restoring and building the same shared projects twice per push to prove the same thing |
+| Bootstrap creates the CI/CD app registration | Bootstrap creates only its **role assignment** | The registration is ordinary Terraform (identity module). The Contributor grant cannot be, because CI needs that grant in order to run `terraform apply` at all |
+| `--collect:"XPlat Code Coverage" --logger trx` | `--coverage --report-trx` | VSTest flags are silently ignored under MTP. `--report-trx` additionally needs `Microsoft.Testing.Extensions.TrxReport` referenced, or the run fails with "Zero tests ran" and no useful message |
+| Container app image set by Terraform | `ignore_changes` on the image | CI owns the tag after the first deploy. Without this, every `terraform apply` rolls the app back to whatever the variable holds, silently undoing the newest deployment |
+
+The container app also ships with a deliberately wrong default image (`mcr.microsoft.com/dotnet/samples:aspnetapp`). Container Apps requires a resolvable image at creation time, and the GHCR image does not exist until CI has pushed one, so the first apply would otherwise fail on a chicken-and-egg.
 
 ### Phase 2, judge pipeline
 - [ ] Storage Queue publish on `POST /api/submissions`

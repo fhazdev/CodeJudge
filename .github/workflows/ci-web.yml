@@ -1,0 +1,48 @@
+name: CI (web)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/ci-web.yml'
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/ci-web.yml'
+
+defaults:
+  run:
+    working-directory: apps/web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # `npm ci` rather than `npm install`: it installs exactly the lock file and fails
+      # if package.json and the lock have drifted, which is what a CI install should do.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # `tsc -b` runs as part of `npm run build`, so a type error fails the build. There
+      # is no separate typecheck step because there would be nothing left for it to do.
+      - name: Build
+        run: npm run build
+
+      # Fails on a known vulnerability at moderate or above. monaco-editor pulls a
+      # vulnerable dompurify transitively; package.json overrides it, and this step is
+      # what notices if that override ever stops working.
+      - name: Audit
+        run: npm audit --audit-level=moderate

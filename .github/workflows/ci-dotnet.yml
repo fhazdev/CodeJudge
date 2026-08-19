@@ -1,0 +1,87 @@
+# Builds and tests the whole .NET solution.
+#
+# The build plan sketched separate ci-api.yml and ci-judge.yml. They are one workflow
+# here because they are one solution: splitting them would mean restoring and building
+# the same shared projects twice per push to prove the same thing.
+name: CI (.NET)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'apps/judge/**'
+      - '*.props'
+      - 'global.json'
+      - 'CodeJudge.slnx'
+      - '.github/workflows/ci-dotnet.yml'
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'apps/judge/**'
+      - '*.props'
+      - 'global.json'
+      - 'CodeJudge.slnx'
+      - '.github/workflows/ci-dotnet.yml'
+
+jobs:
+  build-and-test:
+    # ubuntu-latest ships a Docker daemon, which the integration tests need for
+    # Testcontainers. The judge's own tests need only a .NET runtime.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore CodeJudge.slnx
+
+      - name: Build
+        run: dotnet build CodeJudge.slnx --configuration Release --no-restore
+
+      # MTP flags, not VSTest ones. --collect and --logger are silently ignored here:
+      # xUnit v3 hosts Microsoft.Testing.Platform, opted into via global.json.
+      - name: Test
+        run: dotnet test --solution CodeJudge.slnx --configuration Release --no-build --coverage --report-trx
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          # TRX and coverage land in a TestResults folder at the repository root, not
+          # beside each project, so both shapes are listed.
+          path: |
+            TestResults/**
+            **/TestResults/**
+          if-no-files-found: ignore
+
+  docker:
+    name: Build API image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Proves the image builds on every PR. Pushing to GHCR happens in cd-deploy,
+      # only after a merge to main.
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/CodeJudge.Api/Dockerfile
+          push: false
+          tags: codejudge-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,112 @@
+# Terraform plan on pull requests, apply on merge to main.
+#
+# Requires, once the GitHub repository exists:
+#   Variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#              TFSTATE_RESOURCE_GROUP, TFSTATE_STORAGE_ACCOUNT, TFSTATE_CONTAINER
+#   Secrets:   NEON_CONNECTION_STRING
+#
+# AZURE_CLIENT_ID is the CI/CD app registration created by infra/terraform/identity once
+# var.github_repository is set. Its Contributor grant comes from infra/bootstrap, because
+# the grant has to exist before this workflow can apply anything.
+#
+# No client secret anywhere: id-token: write lets GitHub mint a short-lived OIDC token
+# that Entra trusts because of the federated credential's subject match.
+name: CD (infrastructure)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/cd-infra.yml'
+  pull_request:
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/cd-infra.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required to request the OIDC token
+  contents: read
+  pull-requests: write
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  ARM_USE_OIDC: 'true'
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform/platform
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=platform.tfstate"
+
+      # Fails the build on unformatted files. Cheap, and it keeps formatting arguments
+      # out of code review entirely.
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          terraform plan -no-color -input=false -out=tfplan \
+            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
+            -var="neon_connection_string=${{ secrets.NEON_CONNECTION_STRING }}"
+
+      - name: Comment plan on the pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process')
+            const plan = execSync('terraform show -no-color tfplan', {
+              cwd: 'infra/terraform/platform',
+              maxBuffer: 10 * 1024 * 1024,
+            }).toString()
+
+            // A long plan exceeds GitHub's comment limit, so keep the tail: the summary
+            // line and the last resources are the part worth reading.
+            const body = plan.length > 60000
+              ? '```\n…truncated…\n' + plan.slice(-60000) + '\n```'
+              : '```\n' + plan + '\n```'
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Terraform plan\n\n${body}`,
+            })
+
+      # Applies the exact plan file that was reviewed, not a freshly computed one.
+      # Re-planning at apply time would silently act on whatever changed in between.
+      - name: Terraform apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -input=false -auto-approve tfplan
