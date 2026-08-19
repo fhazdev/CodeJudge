@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using CodeJudge.Application.Abstractions;
 using CodeJudge.Infrastructure.Persistence;
 using CodeJudge.Infrastructure.Persistence.Seed;
 using Microsoft.AspNetCore.Authentication;
@@ -35,6 +37,9 @@ public sealed class CodeJudgeApiFactory : WebApplicationFactory<Program>, IAsync
         .WithUsername("codejudge")
         .WithPassword("testing")
         .Build();
+
+    /// <summary>Ids handed to the queue, in order, across the whole suite.</summary>
+    public RecordingSubmissionQueue Queue { get; } = new();
 
     public async ValueTask InitializeAsync()
     {
@@ -85,8 +90,28 @@ public sealed class CodeJudgeApiFactory : WebApplicationFactory<Program>, IAsync
                 options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
             });
 
+            // A fake queue rather than Azurite. These tests are about the HTTP contract:
+            // status codes, the Location header, ownership scoping. Standing up a storage
+            // emulator to prove those would make the suite slower and no more truthful.
+            // The real queue round trip is covered end to end by running the worker.
+            services.RemoveAll<ISubmissionQueue>();
+            services.AddSingleton<ISubmissionQueue>(Queue);
+
             services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         });
+    }
+}
+
+public sealed class RecordingSubmissionQueue : ISubmissionQueue
+{
+    private readonly ConcurrentQueue<Guid> _enqueued = new();
+
+    public IReadOnlyCollection<Guid> Enqueued => _enqueued;
+
+    public Task EnqueueAsync(Guid submissionId, CancellationToken ct = default)
+    {
+        _enqueued.Enqueue(submissionId);
+        return Task.CompletedTask;
     }
 }
 

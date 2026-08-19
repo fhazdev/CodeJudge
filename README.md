@@ -7,8 +7,8 @@ Design: [codejudge-architecture-plan.md](codejudge-architecture-plan.md) for the
 architecture, [docs/build-plan.md](docs/build-plan.md) for decisions, sequencing and the
 timeout budget.
 
-**Status: phase 1 in progress.** The judge, the API and the web app all run locally.
-Submission and the Azure infrastructure are not built yet.
+**Status: phase 2, local.** Submit code in the browser and get a verdict. The Azure
+infrastructure is written but not provisioned.
 
 ## Prerequisites
 
@@ -26,12 +26,16 @@ docker compose up -d
 dotnet run --project apps/judge/CodeJudge.Judge -- seed
 ```
 
-Then, in two terminals:
+Then, in three terminals:
 
 ```powershell
 dotnet run --project apps/api/CodeJudge.Api          # http://localhost:5199
 npm --prefix apps/web run dev                        # http://localhost:5173
+dotnet run --project apps/judge/CodeJudge.Judge -- worker
 ```
+
+The worker is the piece that actually judges. Without it running, submissions sit at
+Queued and the UI polls until it gives up.
 
 Sign in with **any Microsoft account**. If a work or school account is blocked by an
 administrator, use a personal one; see [the build plan](docs/build-plan.md) for why that
@@ -39,10 +43,22 @@ happens and why nothing on our side can fix it.
 
 ### Judging from the command line
 
+No API and no sign-in required:
+
 ```powershell
 dotnet run --project apps/judge/CodeJudge.Judge -- problems
+
+# Judge a file directly, bypassing the queue entirely.
 dotnet run --project apps/judge/CodeJudge.Judge -- judge --problem two-sum --file my-solution.cs
+
+# Or exercise the real queue: enqueue, then run one worker execution.
+dotnet run --project apps/judge/CodeJudge.Judge -- submit --problem two-sum --file my-solution.cs
+dotnet run --project apps/judge/CodeJudge.Judge -- worker --once
+dotnet run --project apps/judge/CodeJudge.Judge -- submissions
 ```
+
+`worker --once` claims at most one message and exits, which is exactly what a Container
+Apps Job execution does. The plain `worker` loop exists only for local convenience.
 
 A solution is an ordinary `Solution` class, exactly as it would be on LeetCode:
 
@@ -77,9 +93,15 @@ The verdict matrix in `apps/judge/tests` needs neither Postgres nor Docker. It d
 and kill real child processes for the time-limit and memory-limit cases, so expect a few
 seconds.
 
+The worker tests and the API integration tests do need Docker: they run against a real
+Postgres and a real Azurite via Testcontainers, because an in-memory substitute would pass
+tests that production fails.
+
 ## How judging works
 
 ```
+POST /api/submissions ──▶ row (Queued) ──▶ Storage Queue ──▶ worker
+                                                              │
 submission ──▶ Roslyn compile (10 s cap)  ──▶ CompileError
                       │
                       ▼
@@ -109,11 +131,13 @@ apps/api/CodeJudge.Api               controllers, Entra auth, user provisioning
 apps/judge/CodeJudge.Judge           compile, orchestrate, verdict
 apps/judge/CodeJudge.Judge.Runner    the sandbox child process
 apps/web                             React, TypeScript, MSAL, Monaco
+infra/bootstrap                      Terraform state prerequisites
 infra/terraform/identity             Entra app registrations (applied)
+infra/terraform/platform             Azure resources (written, not applied)
 docs/                                build plan
 ```
 
-`infra/terraform/platform` and the queue wiring arrive next.
+Remaining: the Container Apps Job for the judge, its Dockerfile, and the deploy workflow.
 
 ## Authentication
 

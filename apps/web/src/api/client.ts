@@ -1,6 +1,6 @@
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
 import { apiBaseUrl, apiScope, msalInstance } from '../auth/msalConfig'
-import type { PagedResult, ProblemDetail, ProblemSummary } from './types'
+import type { PagedResult, ProblemDetail, ProblemSummary, Submission } from './types'
 
 export class ApiError extends Error {
   // Declared and assigned rather than a constructor parameter property: the template
@@ -88,4 +88,12 @@ export const api = {
     request<PagedResult<ProblemSummary>>(`/api/problems?page=${page}&pageSize=${pageSize}`),
 
   getProblem: (slug: string) => request<ProblemDetail>(`/api/problems/${slug}`),
+
+  createSubmission: (problemSlug: string, code: string) =>
+    request<Submission>('/api/submissions', {
+      method: 'POST',
+      body: JSON.stringify({ problemSlug, language: 'csharp', code }),
+    }),
+
+  getSubmission: (id: string) => request<Submission>(`/api/submissions/${id}`),
 }

@@ -40,3 +40,44 @@ export interface ProblemDetail {
   memoryLimitKb: number
   examples: ProblemExample[]
 }
+
+export type SubmissionStatus =
+  | 'Queued'
+  | 'Running'
+  | 'Accepted'
+  | 'WrongAnswer'
+  | 'TimeLimitExceeded'
+  | 'RuntimeError'
+  | 'CompileError'
+  | 'MemoryLimitExceeded'
+  | 'InternalError'
+
+export interface Submission {
+  id: string
+  problemSlug: string
+  language: string
+  status: SubmissionStatus
+  /**
+   * Computed by the API rather than derived here. Re-deriving "is this finished" from the
+   * status union is exactly how a client and server drift apart when a status is added.
+   */
+  isTerminal: boolean
+  runtimeMs: number | null
+  memoryKb: number | null
+  failedCaseOrdinal: number | null
+  stderrExcerpt: string | null
+  createdAt: string
+  completedAt: string | null
+}
+
+export const STATUS_LABELS: Record<SubmissionStatus, string> = {
+  Queued: 'Queued',
+  Running: 'Running',
+  Accepted: 'Accepted',
+  WrongAnswer: 'Wrong Answer',
+  TimeLimitExceeded: 'Time Limit Exceeded',
+  RuntimeError: 'Runtime Error',
+  CompileError: 'Compile Error',
+  MemoryLimitExceeded: 'Memory Limit Exceeded',
+  InternalError: 'Judge Error',
+}

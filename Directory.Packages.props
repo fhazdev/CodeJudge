@@ -45,8 +45,16 @@
       if a licence is held.
     -->
     <PackageVersion Include="MediatR" Version="12.5.0" />
+    <!-- Abstractions only. The Application layer logs; it does not choose a sink. -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Messaging">
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.27.1" />
+    <!-- DefaultAzureCredential in Azure; unused locally, where Azurite takes a key. -->
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
   </ItemGroup>
 
   <ItemGroup Label="Api">
@@ -58,6 +66,7 @@
   <ItemGroup Label="Integration testing">
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.Azurite" Version="4.14.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

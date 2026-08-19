@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
 import { api } from '../api/client'
 import type { ProblemDetail } from '../api/types'
+import { useSubmission } from '../hooks/useSubmission'
+import { SubmissionResult } from '../components/SubmissionResult'
 
 export function ProblemDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -10,6 +12,9 @@ export function ProblemDetailPage() {
   const [problem, setProblem] = useState<ProblemDetail | null>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  const { submission, isSubmitting, timedOut, error: submitError, submit, reset } =
+    useSubmission(slug)
 
   // Keyed on the slug rather than reset inside the effect. Calling setState synchronously
   // in an effect triggers a second render pass before anything is painted; tracking the
@@ -20,6 +25,7 @@ export function ProblemDetailPage() {
     setLoadedSlug(slug)
     setProblem(null)
     setError(null)
+    reset()
   }
 
   useEffect(() => {
@@ -133,16 +139,31 @@ export function ProblemDetailPage() {
             <button
               type="button"
               className="button button-ghost"
-              onClick={() => setCode(problem.starterCode)}
+              disabled={isSubmitting}
+              onClick={() => {
+                setCode(problem.starterCode)
+                reset()
+              }}
             >
               Reset
             </button>
 
-            {/* Submission arrives in phase 2, along with the queue and the judge job. */}
-            <button type="button" className="button button-primary" disabled>
-              Submit
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={isSubmitting || code.trim().length === 0}
+              onClick={() => void submit(code)}
+            >
+              {isSubmitting ? 'Judging…' : 'Submit'}
             </button>
           </div>
+
+          <SubmissionResult
+            submission={submission}
+            isSubmitting={isSubmitting}
+            timedOut={timedOut}
+            error={submitError}
+          />
 
           <p className="muted small">
             Write a <code>Solution</code> class. There is no <code>Main</code>: each

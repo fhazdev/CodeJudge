@@ -493,15 +493,45 @@ Later in the phase, four more:
 
 The container app also ships with a deliberately wrong default image (`mcr.microsoft.com/dotnet/samples:aspnetapp`). Container Apps requires a resolvable image at creation time, and the GHCR image does not exist until CI has pushed one, so the first apply would otherwise fail on a chicken-and-egg.
 
-### Phase 2, judge pipeline
-- [ ] Storage Queue publish on `POST /api/submissions`
-- [ ] Judge worker: dequeue loop, poison handling, verdict write-back
-- [ ] `azurerm_container_app_job` with `azure-queue` scale rule, managed-identity auth via `storageAccountResourceId`, `parallelism = 1`
-- [ ] UAMI role assignments: Storage Queue Data Message Processor + Reader on the storage account, Key Vault Secrets User
+### Phase 2, judge pipeline — **local half complete**
+- [x] Storage Queue publish on `POST /api/submissions`
+- [x] Judge worker: `worker` and `worker --once`, poison handling, verdict write-back
+- [x] SPA submission + polling + results panel
+- [x] UAMI role assignments (done early, in the phase 1 platform module)
+- [ ] `azurerm_container_app_job` with `azure-queue` scale rule and managed-identity auth
+- [ ] Judge Dockerfile
 - [ ] `ci-judge.yml` + `cd-deploy.yml` (GHCR push, then `az containerapp update` / `job update`)
-- [ ] SPA submission + polling + results panel
 
-**Exit criterion:** end-to-end submit to verdict in the deployed environment, all verdict types reachable.
+**Local exit criterion met.** Four submissions through the real Azurite queue, one worker
+execution each:
+
+```
+good.cs    -> Accepted           66 ms
+wrong.cs   -> WrongAnswer        72 ms   case #1
+loop.cs    -> TimeLimitExceeded  2061 ms case #1
+broken.cs  -> CompileError
+(5th run)  -> NoWork
+```
+
+**Deployed exit criterion outstanding**, pending the Container Apps Job.
+
+#### What phase 2 changed about the plan
+
+| Planned | Built | Why |
+|---|---|---|
+| Judge worker as a dequeue loop | `ProcessNextAsync`, one message per call, with `--once` and a loop wrapper | A Container Apps Job execution *is* one unit of work: KEDA starts a container and it exits. Shaping the core around a loop would mean the local and deployed shapes differ in the one component hardest to debug remotely |
+| Submissions enqueued, then judged | Row written first, enqueue second, `InternalError` if the enqueue throws | Enqueue-first risks a message arriving before the row exists. Write-first risks a stranded `Queued` row, so that case is marked terminal immediately rather than leaving a spinner forever. A transactional outbox is the rigorous fix and more machinery than this earns |
+| Client derives "finished" from status | API returns `isTerminal` | Re-deriving the terminal set in TypeScript is how a client and server drift apart the moment a status is added |
+
+Three worker behaviours that no verdict test reaches, and now have their own tests: an
+already-judged submission is discarded rather than re-judged (reachable when a verdict was
+written but the delete did not land); a message for a deleted row is dropped rather than
+retried forever; and an unparseable message is discarded rather than left to re-trigger
+KEDA indefinitely.
+
+A local-only `judge submit` command was added so the queue-to-verdict path can be
+exercised from a terminal. Acquiring a real Entra token needs an interactive browser
+sign-in, which would otherwise make the one untested link also the hardest to try by hand.
 
 ### Phase 3, polish
 - [ ] 10 to 15 problems

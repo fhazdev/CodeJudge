@@ -51,3 +51,32 @@ public interface IClock
 {
     DateTimeOffset UtcNow { get; }
 }
+
+/// <summary>
+/// Hands a submission off for judging. The message carries only the id: submitted code
+/// can be tens of kilobytes and a queue message is capped at 64 KB, so the code stays in
+/// the database and the judge reads it from there.
+/// </summary>
+public interface ISubmissionQueue
+{
+    Task EnqueueAsync(Guid submissionId, CancellationToken ct = default);
+}
+
+public interface ISubmissionRepository
+{
+    Task AddAsync(Submission submission, CancellationToken ct = default);
+
+    /// <summary>
+    /// Scoped to the owner on purpose. Returning null for someone else's submission
+    /// rather than throwing a 403 means the endpoint answers "no such submission" either
+    /// way, so a stranger cannot probe which ids exist.
+    /// </summary>
+    Task<Submission?> GetForUserAsync(Guid submissionId, Guid userId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<Submission>> ListForUserAsync(
+        Guid userId, Guid? problemId, int skip, int take, CancellationToken ct = default);
+
+    Task<int> CountForUserAsync(Guid userId, Guid? problemId, CancellationToken ct = default);
+
+    Task SaveChangesAsync(CancellationToken ct = default);
+}

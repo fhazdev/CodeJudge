@@ -329,3 +329,93 @@ h2 {
 .problem-editor .muted {
   margin-top: 0.9rem;
 }
+
+/* Submission result ------------------------------------------------------ */
+
+.result {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.result-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.result p {
+  margin: 0.45rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.result-accepted {
+  border-left-color: var(--easy);
+}
+.result-accepted strong {
+  color: var(--easy);
+}
+
+.result-rejected {
+  border-left-color: var(--hard);
+}
+.result-rejected strong {
+  color: var(--hard);
+}
+
+.result-pending {
+  border-left-color: var(--accent);
+}
+
+.result-error {
+  border-left-color: var(--error);
+}
+.result-error strong {
+  color: var(--error);
+}
+
+.result-metrics {
+  display: flex;
+  gap: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-detail {
+  margin: 0.7rem 0 0;
+  padding: 0.7rem 0.8rem;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.5s;
+  }
+}

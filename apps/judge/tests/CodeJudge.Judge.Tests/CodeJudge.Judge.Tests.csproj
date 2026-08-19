@@ -16,6 +16,13 @@
     <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="NSubstitute" />
+    <!--
+      Only the worker tests need these. The verdict matrix deliberately needs no
+      container at all, and that stays true: WorkerTests is the one class here that
+      requires Docker.
+    -->
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Azurite" />
   </ItemGroup>
 
   <ItemGroup>

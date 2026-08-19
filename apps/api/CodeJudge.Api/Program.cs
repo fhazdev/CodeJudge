@@ -4,6 +4,7 @@ using CodeJudge.Api.Filters;
 using CodeJudge.Application;
 using CodeJudge.Application.Abstractions;
 using CodeJudge.Infrastructure;
+using CodeJudge.Infrastructure.Messaging;
 using CodeJudge.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
@@ -69,6 +70,16 @@ var connectionString =
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString);
+
+builder.Services.AddSubmissionQueue(new QueueOptions
+{
+    // QueueUri wins when set, which is the Azure path (managed identity). Locally only
+    // ConnectionString is present and points at Azurite.
+    QueueUri = builder.Configuration["Queue:QueueUri"]
+               ?? Environment.GetEnvironmentVariable("CODEJUDGE_QUEUE_URI"),
+    ConnectionString = builder.Configuration["Queue:ConnectionString"],
+    QueueName = builder.Configuration["Queue:QueueName"] ?? "submissions"
+});
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();

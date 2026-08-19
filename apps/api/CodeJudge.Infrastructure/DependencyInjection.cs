@@ -1,4 +1,6 @@
+using Azure.Storage.Queues;
 using CodeJudge.Application.Abstractions;
+using CodeJudge.Infrastructure.Messaging;
 using CodeJudge.Infrastructure.Persistence;
 using CodeJudge.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +33,25 @@ public static class DependencyInjection
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IProblemRepository, ProblemRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ISubmissionRepository, SubmissionRepository>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the submission queue. Separate from AddInfrastructure because the judge
+    /// needs the read side without a MediatR pipeline, and the API needs the write side
+    /// without a dequeue loop.
+    /// </summary>
+    public static IServiceCollection AddSubmissionQueue(
+        this IServiceCollection services, QueueOptions options)
+    {
+        // QueueClient is thread-safe and designed to be long-lived, so a singleton avoids
+        // rebuilding its HTTP pipeline (and re-authenticating) on every request.
+        services.AddSingleton(_ => QueueClientFactory.Create(options));
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<ISubmissionQueue, StorageSubmissionQueue>();
+        services.AddSingleton<SubmissionQueueReader>();
 
         return services;
     }
