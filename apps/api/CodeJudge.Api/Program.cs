@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using CodeJudge.Api.Auth;
 using CodeJudge.Api.Filters;
 using CodeJudge.Application;
@@ -72,7 +73,15 @@ builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
-builder.Services.AddControllers(options => options.Filters.Add<ValidationExceptionFilter>());
+builder.Services
+    .AddControllers(options => options.Filters.Add<ValidationExceptionFilter>())
+    .AddJsonOptions(options =>
+    {
+        // Enums as names, not integers. The default would put `"difficulty": 0` on the
+        // wire, which forces every client to hardcode the ordinal and silently breaks
+        // the moment a value is inserted into the middle of the enum.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 

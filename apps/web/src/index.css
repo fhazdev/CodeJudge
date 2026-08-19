@@ -1,0 +1,331 @@
+:root {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --surface-hover: #1e222b;
+  --border: #262b36;
+  --text: #e6e8ee;
+  --text-muted: #8b93a7;
+  --accent: #4f8cff;
+  --accent-hover: #6b9dff;
+  --easy: #2dd4a7;
+  --medium: #f0b429;
+  --hard: #f2637e;
+  --error: #f2637e;
+
+  color-scheme: dark;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+code,
+pre {
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand {
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand span {
+  color: var(--accent);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.account-name {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 3rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.25rem;
+}
+
+h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.75rem 0 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.error {
+  color: var(--error);
+}
+
+/* Buttons ---------------------------------------------------------------- */
+
+.button {
+  border-radius: 7px;
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 550;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: #08101f;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.button-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Sign in ---------------------------------------------------------------- */
+
+.signin {
+  max-width: 34rem;
+  margin: 5rem auto 0;
+  text-align: center;
+}
+
+.signin h1 {
+  font-size: 2rem;
+}
+
+.signin-lead {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.signin-note {
+  margin-top: 2rem;
+  font-size: 0.825rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* Problem list ----------------------------------------------------------- */
+
+.problem-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.problem-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.problem-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.problem-row:hover {
+  background: var(--surface-hover);
+}
+
+.problem-title {
+  font-weight: 500;
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid currentcolor;
+}
+
+.badge-easy {
+  color: var(--easy);
+}
+.badge-medium {
+  color: var(--medium);
+}
+.badge-hard {
+  color: var(--hard);
+}
+
+/* Problem detail --------------------------------------------------------- */
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--text);
+}
+
+.problem-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .problem-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.problem-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.problem-heading h1 {
+  margin: 0;
+}
+
+.prose {
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.65;
+  margin: 0;
+  color: var(--text);
+}
+
+.example {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.example-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.example pre {
+  margin: 0;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.limits {
+  margin-top: 1.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.problem-editor {
+  position: sticky;
+  top: 1.5rem;
+}
+
+.editor-shell {
+  height: 60vh;
+  min-height: 24rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.problem-editor .muted {
+  margin-top: 0.9rem;
+}

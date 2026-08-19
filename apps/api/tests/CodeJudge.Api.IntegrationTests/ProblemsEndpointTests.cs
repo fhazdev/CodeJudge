@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CodeJudge.Application.Common;
 using CodeJudge.Application.Problems;
 using CodeJudge.Infrastructure.Persistence;
@@ -12,8 +13,13 @@ namespace CodeJudge.Api.IntegrationTests;
 [Collection(nameof(ApiCollection))]
 public sealed class ProblemsEndpointTests(CodeJudgeApiFactory factory)
 {
-    private static readonly JsonSerializerOptions Json =
-        new(JsonSerializerDefaults.Web);
+    // Mirrors the API's own configuration. The converter is required because the API
+    // writes enums as names; without it these reads fail, which is itself a useful signal
+    // that the wire format is what the TypeScript client expects.
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     [Fact]
     public async Task ListRequiresAuthentication()
@@ -86,6 +92,20 @@ public sealed class ProblemsEndpointTests(CodeJudgeApiFactory factory)
 
         // The visible ones are supposed to be there.
         body.ShouldContain("[2,7,11,15]");
+    }
+
+    /// <summary>
+    /// Enums must serialize as names. The default integer form would make every client
+    /// hardcode ordinals, and inserting a value into the middle of the enum later would
+    /// silently reinterpret every existing response.
+    /// </summary>
+    [Fact]
+    public async Task DifficultySerializesAsAName()
+    {
+        var body = await factory.CreateAuthenticatedClient()
+            .GetStringAsync("/api/problems/two-sum", TestContext.Current.CancellationToken);
+
+        body.ShouldContain("\"difficulty\":\"Easy\"");
     }
 
     [Fact]

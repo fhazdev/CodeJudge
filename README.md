@@ -7,20 +7,39 @@ Design: [codejudge-architecture-plan.md](codejudge-architecture-plan.md) for the
 architecture, [docs/build-plan.md](docs/build-plan.md) for decisions, sequencing and the
 timeout budget.
 
-**Status: phase 0 complete.** The judge works end to end locally. No Azure, no API, no
-frontend yet.
+**Status: phase 1 in progress.** The judge, the API and the web app all run locally.
+Submission and the Azure infrastructure are not built yet.
 
 ## Prerequisites
 
 - .NET 10 SDK (10.0.302 or later)
+- Node 22 or later
 - Docker Desktop
 
 ## Running it
 
+Everything below works with no configuration. The Entra app registrations already exist
+and their client ids are compiled in as defaults; none of them are secrets.
+
 ```powershell
 docker compose up -d
-
 dotnet run --project apps/judge/CodeJudge.Judge -- seed
+```
+
+Then, in two terminals:
+
+```powershell
+dotnet run --project apps/api/CodeJudge.Api          # http://localhost:5199
+npm --prefix apps/web run dev                        # http://localhost:5173
+```
+
+Sign in with **any Microsoft account**. If a work or school account is blocked by an
+administrator, use a personal one; see [the build plan](docs/build-plan.md) for why that
+happens and why nothing on our side can fix it.
+
+### Judging from the command line
+
+```powershell
 dotnet run --project apps/judge/CodeJudge.Judge -- problems
 dotnet run --project apps/judge/CodeJudge.Judge -- judge --problem two-sum --file my-solution.cs
 ```
@@ -84,11 +103,28 @@ plan for what is and is not defended against, and what is deferred.
 
 ```
 apps/api/CodeJudge.Domain            entities and enums, no dependencies
-apps/api/CodeJudge.Infrastructure    EF Core, Npgsql, migrations, seed problems
+apps/api/CodeJudge.Application       MediatR handlers, DTOs, validators, abstractions
+apps/api/CodeJudge.Infrastructure    EF Core, Npgsql, migrations, repositories, seed
+apps/api/CodeJudge.Api               controllers, Entra auth, user provisioning
 apps/judge/CodeJudge.Judge           compile, orchestrate, verdict
 apps/judge/CodeJudge.Judge.Runner    the sandbox child process
+apps/web                             React, TypeScript, MSAL, Monaco
+infra/terraform/identity             Entra app registrations (applied)
 docs/                                build plan
 ```
 
-`apps/api/CodeJudge.Api`, `CodeJudge.Application` and `apps/web` arrive in phase 1;
-`infra/terraform` and the queue wiring in phase 2.
+`infra/terraform/platform` and the queue wiring arrive next.
+
+## Authentication
+
+Multi-tenant plus personal Microsoft accounts, so anyone can sign in. The SPA is a public
+client using authorization code flow with PKCE; the API validates tokens against
+`/common`, which means there is no single issuer to pin and `Microsoft.Identity.Web`'s
+`AadIssuerValidator` does the work.
+
+Two things worth knowing if you touch this:
+
+- The SPA must send the **access token**, not the ID token. The ID token identifies the
+  user to the browser app; only the access token carries the API as its audience.
+- Redirect URIs must match byte for byte, trailing slash included. `vite.config.ts` pins
+  port 5173 with `strictPort` for exactly this reason.
