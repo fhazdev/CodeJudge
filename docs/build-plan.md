@@ -2,7 +2,7 @@
 
 Companion to [codejudge-architecture-plan.md](../codejudge-architecture-plan.md). That document says *what* the system is. This one says *what to build, in what order, and what was decided along the way*.
 
-Status: planning complete, no code written yet.
+Status: phases 0 and 1 in progress. Judge core, API and web app all working locally; Azure infrastructure not yet provisioned.
 
 ---
 
@@ -457,16 +457,29 @@ judge --problem two-sum --file loop.cs   →  TimeLimitExceeded  2061 ms, case #
 
 Also added beyond the checklist: an environment scrub on the child process (the parent holds a database connection string, the child hosts untrusted code, and those two should not meet), and a reference allowlist proving a submission cannot reach EF Core or Npgsql even though the judge process has both loaded.
 
-### Phase 1, skeleton + auth
+### Phase 1, skeleton + auth — **auth complete, infrastructure outstanding**
+- [x] Entra app registrations, as Terraform in `infra/terraform/identity` (local state)
+- [x] API: MediatR + Clean Architecture skeleton, `Microsoft.Identity.Web`, problems endpoints
+- [x] Web: Vite + React + TS, MSAL sign-in, problem list, Monaco on the detail page
+- [x] **Sign-in verified end to end against real Entra.** The risk-table item is closed
+- [ ] Verify with a **second, unrelated** Microsoft account, not the subscription owner
+- [ ] API Dockerfile
 - [ ] `infra/bootstrap/bootstrap.ps1`: state RG, storage account, container, GitHub OIDC app
-- [ ] Terraform: RG, Log Analytics, Container Apps environment, storage + queue, Key Vault, UAMI, Static Web App, three app registrations
+- [ ] Terraform platform module: RG, Log Analytics, Container Apps environment, storage + queue, Key Vault, UAMI, Static Web App
 - [ ] Neon project created, connection string into Key Vault
-- [ ] API: MediatR + Clean Architecture skeleton, `Microsoft.Identity.Web`, problems endpoints, Dockerfile
-- [ ] Web: Vite + React + TS, MSAL sign-in, problem list, Monaco on the detail page
 - [ ] `ci-api.yml`, `ci-web.yml`, `cd-infra.yml` (plan on PR, apply on main)
-- [ ] Verify sign-in with a **second, unrelated** Microsoft account, not the subscription owner (section 6)
 
-**Exit criterion:** signed in with a personal Microsoft account on the deployed SWA, seeing the problem list from the live API.
+**Exit criterion:** signed in with a personal Microsoft account on the deployed SWA, seeing the problem list from the live API. Met locally; the deployed half waits on the platform module.
+
+#### What phase 1 changed about the plan
+
+| Planned | Built | Why |
+|---|---|---|
+| Two app registrations | Three, one gated behind a variable | GitHub Actions OIDC needs its own. It is not created until `var.github_repository` is set, because a federated credential aimed at a repository that does not exist looks configured while granting nothing |
+| One Terraform root module | Split `identity` and `platform` | Entra registrations are tenant-scoped, near-static, and must survive a `terraform destroy` of the infrastructure. Splitting also let identity be applied before any state backend existed |
+| Enum serialization unconsidered | `JsonStringEnumConverter` | Writing the TypeScript types surfaced that the API was sending `"difficulty": 0`. Every client would have hardcoded ordinals, and inserting an enum value later would silently reinterpret stored responses |
+
+Three Entra constraints that cost a plan/apply cycle each, now encoded in the Terraform: root redirect URIs require a trailing slash; **every** registration allowing personal accounts must request v2 tokens, including the SPA that exposes no scopes; and the identifier URI needs a separate resource because it embeds the client id that does not exist until after creation.
 
 ### Phase 2, judge pipeline
 - [ ] Storage Queue publish on `POST /api/submissions`
