@@ -139,8 +139,6 @@ resource "azurerm_role_assignment" "workload_secrets_user" {
 }
 
 resource "azurerm_key_vault_secret" "neon_connection_string" {
-  count = var.neon_connection_string == "" ? 0 : 1
-
   name         = "neon-connection-string"
   value        = var.neon_connection_string
   key_vault_id = azurerm_key_vault.main.id

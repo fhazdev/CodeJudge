@@ -12,15 +12,21 @@ terraform {
     }
   }
 
-  # Populated by infra/bootstrap/bootstrap.ps1, which prints the exact block to paste.
-  # Left commented so `terraform init` works locally before the bootstrap has been run.
+  # Created by infra/bootstrap/bootstrap.ps1, which printed exactly this block.
   #
-  # backend "azurerm" {
-  #   resource_group_name  = "rg-codejudge-tfstate"
-  #   storage_account_name = "stcjtfstate________"
-  #   container_name       = "tfstate"
-  #   key                  = "platform.tfstate"
-  # }
+  # The resource group, storage account and container are shared by every project in the
+  # subscription. Only the key is project-specific, which is what keeps a second project
+  # from needing its own state account.
+  #
+  # CI passes the first three again as -backend-config flags in cd-infra.yml, from the
+  # TFSTATE_* repository variables. They agree with these values; the flags exist so the
+  # workflow does not depend on this file being correct for someone else's subscription.
+  backend "azurerm" {
+    resource_group_name  = "rg-tfstate"
+    storage_account_name = "sttfstate8d1070c5"
+    container_name       = "tfstate"
+    key                  = "codejudge-platform.tfstate"
+  }
 }
 
 provider "azurerm" {

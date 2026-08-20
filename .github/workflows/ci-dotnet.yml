@@ -69,8 +69,31 @@ jobs:
           if-no-files-found: ignore
 
   docker:
-    name: Build API image
+    name: Build images
     runs-on: ubuntu-latest
+
+    # The judge smoke test below seeds a database and then judges against it. A real
+    # Postgres is the point: an in-memory substitute would pass happily while the
+    # published image is broken, which is the entire class of bug this job exists for.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: codejudge
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: codejudge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codejudge -d codejudge"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      CODEJUDGE_CONNECTION: Host=localhost;Port=5432;Database=codejudge;Username=codejudge;Password=localdev
+      FIXTURES: apps/judge/tests/CodeJudge.Judge.Tests/Fixtures
+
     steps:
       - uses: actions/checkout@v5
 
@@ -85,3 +108,54 @@ jobs:
           tags: codejudge-api:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # load: true hands the image to the local daemon, which the smoke tests below need
+      # in order to actually run it.
+      - name: Build judge image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/judge/CodeJudge.Judge/Dockerfile
+          push: false
+          load: true
+          tags: codejudge-judge:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Seeding with the judge image rather than the SDK is deliberate: it exercises the
+      # published binary's database path before anything depends on it.
+      - name: Seed the database using the judge image
+        run: |
+          docker run --rm --network host \
+            -e CODEJUDGE_CONNECTION="$CODEJUDGE_CONNECTION" \
+            codejudge-judge:ci seed
+
+      # `dotnet build` cannot catch this. Runner.targets copies the sandbox runner into
+      # $(OutDir), which `dotnet publish` never consumes, so the image can build perfectly
+      # and still throw FileNotFoundException on its first real submission. Judging
+      # something is the only check that proves the runner actually shipped.
+      - name: Smoke test, a correct submission is Accepted
+        run: |
+          output=$(docker run --rm --network host \
+            -e CODEJUDGE_CONNECTION="$CODEJUDGE_CONNECTION" \
+            -v "$PWD/$FIXTURES:/fixtures:ro" \
+            codejudge-judge:ci judge --problem two-sum --file /fixtures/correct.cs 2>&1)
+          echo "$output"
+          grep -qE "Verdict:[[:space:]]+Accepted" <<< "$output" || {
+            echo "::error::Expected Accepted from the containerised judge."
+            exit 1
+          }
+
+      # The guarantee the entire child-process design exists to provide: a parent that
+      # can still kill a runaway child when both are inside a container.
+      - name: Smoke test, an infinite loop is TimeLimitExceeded
+        run: |
+          output=$(docker run --rm --network host \
+            -e CODEJUDGE_CONNECTION="$CODEJUDGE_CONNECTION" \
+            -v "$PWD/$FIXTURES:/fixtures:ro" \
+            codejudge-judge:ci judge --problem two-sum --file /fixtures/infinite-loop.cs 2>&1)
+          echo "$output"
+          grep -qE "Verdict:[[:space:]]+TimeLimitExceeded" <<< "$output" || {
+            echo "::error::Expected TimeLimitExceeded from the containerised judge."
+            exit 1
+          }

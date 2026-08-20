@@ -1,0 +1,182 @@
+# Builds and publishes both container images, rolls them out, and deploys the SPA.
+#
+# Requires:
+#   Variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#              AZURE_RESOURCE_GROUP, API_CONTAINER_APP, JUDGE_CONTAINER_APP_JOB
+#   Secrets:   AZURE_STATIC_WEB_APPS_API_TOKEN  (terraform output -raw web_api_key)
+#
+# The three resource-name variables come from the platform module's outputs:
+#   AZURE_RESOURCE_GROUP        resource_group_name
+#   API_CONTAINER_APP           api_container_app_name
+#   JUDGE_CONTAINER_APP_JOB     judge_container_app_job_name
+#
+# IMPORTANT: both GHCR packages must be made PUBLIC after the first push. A new package
+# is private by default, and decision D1 has the container app and job pulling
+# anonymously precisely so no registry credentials exist anywhere. Until the visibility
+# is switched, revisions fail to pull with an error that does not mention permissions.
+name: CD (deploy)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - '*.props'
+      - 'global.json'
+      - '.github/workflows/cd-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC token for azure/login
+  contents: read
+  packages: write # push to GHCR
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.tags.outputs.api }}
+      judge_image: ${{ steps.tags.outputs.judge }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # The owner segment of a GHCR reference must be lowercase. GitHub preserves the
+      # case a user registered with, so anyone whose handle has a capital letter would
+      # otherwise produce a reference that cannot be pushed.
+      - name: Compute image references
+        id: tags
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          {
+            echo "owner=${owner}"
+            echo "api=${REGISTRY}/${owner}/codejudge-api:${GITHUB_SHA}"
+            echo "judge=${REGISTRY}/${owner}/codejudge-judge:${GITHUB_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tagged with the commit sha as well as `latest`, and the rollout below references
+      # the sha. Container Apps creates a new revision when the image *reference* changes;
+      # republishing a moving `latest` leaves the reference byte-identical, so the old
+      # image keeps running and the deploy silently does nothing.
+      - name: Push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/CodeJudge.Api/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.api }}
+            ${{ env.REGISTRY }}/${{ steps.tags.outputs.owner }}/codejudge-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Push judge image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/judge/CodeJudge.Judge/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.judge }}
+            ${{ env.REGISTRY }}/${{ steps.tags.outputs.owner }}/codejudge-judge:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  azure:
+    name: Roll out to Container Apps
+    needs: images
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.api.outputs.url }}
+
+    steps:
+      # No client secret: the federated credential on the CI/CD app registration trusts
+      # this repository's OIDC token, the same mechanism cd-infra uses.
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update the API container app
+        id: api
+        run: |
+          az containerapp update \
+            --name "${{ vars.API_CONTAINER_APP }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ needs.images.outputs.api_image }}" \
+            --output none
+
+          # Read the FQDN back rather than carrying it as another variable. One less
+          # thing to keep in sync, and it cannot drift from the resource it describes.
+          fqdn=$(az containerapp show \
+            --name "${{ vars.API_CONTAINER_APP }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+
+          if [ -z "$fqdn" ]; then
+            echo "::error::Could not read the API ingress FQDN."
+            exit 1
+          fi
+
+          echo "url=https://${fqdn}" >> "$GITHUB_OUTPUT"
+
+      # `containerapp job update`, not `containerapp update`. A Container Apps Job is a
+      # distinct resource type and the plain command does not accept one.
+      - name: Update the judge job
+        run: |
+          az containerapp job update \
+            --name "${{ vars.JUDGE_CONTAINER_APP_JOB }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ needs.images.outputs.judge_image }}" \
+            --output none
+
+  web:
+    name: Deploy the SPA
+    needs: azure
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: apps/web
+
+      # Vite inlines VITE_ variables at build time, so this cannot be fixed after the
+      # fact by changing configuration somewhere. Left unset, apiBaseUrl falls back to
+      # http://localhost:5199 and the deploy succeeds into a site that can never reach
+      # its API, which looks like an auth or CORS bug rather than a build one.
+      - name: Build
+        run: npm run build
+        working-directory: apps/web
+        env:
+          VITE_API_BASE_URL: ${{ needs.azure.outputs.api_url }}
+
+      # skip_app_build, because the step above already built with the API URL baked in.
+      # Letting the action build would produce a second bundle without it.
+      - name: Deploy to Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: apps/web/dist
+          skip_app_build: true
+          skip_api_build: true

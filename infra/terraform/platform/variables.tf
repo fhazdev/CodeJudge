@@ -7,7 +7,7 @@ variable "subscription_id" {
 variable "location" {
   description = "Azure region. Container Apps consumption and Static Web Apps free tier must both be available here."
   type        = string
-  default     = "eastus2"
+  default     = "centralus"
 }
 
 variable "name_prefix" {
@@ -35,16 +35,34 @@ variable "api_image" {
   default     = "mcr.microsoft.com/dotnet/samples:aspnetapp"
 }
 
+variable "judge_image" {
+  description = <<-EOT
+    Container image for the judge job.
+
+    Same chicken-and-egg as api_image, and the same resolution. The placeholder is never
+    actually executed: the job only starts when there is a message on the queue, and
+    nothing can enqueue one until the real API is deployed, which happens in the same
+    cd-deploy run that replaces this value.
+  EOT
+  type        = string
+  default     = "mcr.microsoft.com/dotnet/samples:aspnetapp"
+}
+
 variable "neon_connection_string" {
   description = <<-EOT
     Npgsql connection string for the Neon database.
 
-    Empty means the Key Vault secret is not created, which is the phase 1 state: the
-    project is still on docker compose Postgres and no Neon project exists yet.
+    Required. The container app injects this into ConnectionStrings__CodeJudge as a Key
+    Vault secret reference, so an empty value would deploy an API that falls back to
+    localhost Postgres and fails on its first query while still passing /health.
   EOT
   type        = string
-  default     = ""
   sensitive   = true
+
+  validation {
+    condition     = trimspace(var.neon_connection_string) != ""
+    error_message = "Set neon_connection_string (CI passes it from the NEON_CONNECTION_STRING secret). Without it the deployed API has no database."
+  }
 }
 
 variable "spa_allowed_origin" {
