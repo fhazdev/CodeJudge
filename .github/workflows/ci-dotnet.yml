@@ -97,6 +97,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The runner's default builder uses the plain `docker` driver, which cannot export
+      # a cache: `cache-to: type=gha` fails outright with "Cache export is not supported
+      # for the docker driver". This sets up a docker-container driver builder, which can.
+      # `load: true` below still works on that driver.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
       # Proves the image builds on every PR. Pushing to GHCR happens in cd-deploy,
       # only after a merge to main.
       - name: Build API image
@@ -134,12 +141,16 @@ jobs:
       # $(OutDir), which `dotnet publish` never consumes, so the image can build perfectly
       # and still throw FileNotFoundException on its first real submission. Judging
       # something is the only check that proves the runner actually shipped.
+      # `|| true` is load-bearing. The judge CLI exits 1 for any verdict that is not
+      # Accepted, which is correct for scripting it, but these steps run under `bash -e`,
+      # so a non-zero exit aborts the step before the grep below can assert anything. The
+      # grep is the assertion; the exit code is not.
       - name: Smoke test, a correct submission is Accepted
         run: |
           output=$(docker run --rm --network host \
             -e CODEJUDGE_CONNECTION="$CODEJUDGE_CONNECTION" \
             -v "$PWD/$FIXTURES:/fixtures:ro" \
-            codejudge-judge:ci judge --problem two-sum --file /fixtures/correct.cs 2>&1)
+            codejudge-judge:ci judge --problem two-sum --file /fixtures/correct.cs 2>&1) || true
           echo "$output"
           grep -qE "Verdict:[[:space:]]+Accepted" <<< "$output" || {
             echo "::error::Expected Accepted from the containerised judge."
@@ -147,13 +158,14 @@ jobs:
           }
 
       # The guarantee the entire child-process design exists to provide: a parent that
-      # can still kill a runaway child when both are inside a container.
+      # can still kill a runaway child when both are inside a container. This one always
+      # exits non-zero, so the `|| true` above is not optional here.
       - name: Smoke test, an infinite loop is TimeLimitExceeded
         run: |
           output=$(docker run --rm --network host \
             -e CODEJUDGE_CONNECTION="$CODEJUDGE_CONNECTION" \
             -v "$PWD/$FIXTURES:/fixtures:ro" \
-            codejudge-judge:ci judge --problem two-sum --file /fixtures/infinite-loop.cs 2>&1)
+            codejudge-judge:ci judge --problem two-sum --file /fixtures/infinite-loop.cs 2>&1) || true
           echo "$output"
           grep -qE "Verdict:[[:space:]]+TimeLimitExceeded" <<< "$output" || {
             echo "::error::Expected TimeLimitExceeded from the containerised judge."

@@ -74,12 +74,24 @@ jobs:
       - name: Terraform validate
         run: terraform validate -no-color
 
+      # The connection string arrives as TF_VAR_, never interpolated into the script.
+      #
+      # `-var="neon_connection_string=${{ secrets.* }}"` substitutes the raw value into
+      # the shell before bash parses it, so an Npgsql connection string breaks apart at
+      # its own semicolons: the run failed with `SSL: command not found` because
+      # `;SSL Mode=Require` was read as a new command, and terraform meanwhile received a
+      # value truncated at that point and planned to overwrite the real secret with it.
+      #
+      # This is the general rule, not a special case: a secret interpolated into a `run:`
+      # block is both a quoting hazard and a script-injection vector. Pass it via `env:`,
+      # where the value is never parsed by a shell.
       - name: Terraform plan
         id: plan
+        env:
+          TF_VAR_neon_connection_string: ${{ secrets.NEON_CONNECTION_STRING }}
         run: |
           terraform plan -no-color -input=false -out=tfplan \
-            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
-            -var="neon_connection_string=${{ secrets.NEON_CONNECTION_STRING }}"
+            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}"
 
       - name: Comment plan on the pull request
         if: github.event_name == 'pull_request'

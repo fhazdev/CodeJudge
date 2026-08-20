@@ -46,3 +46,24 @@ variable "github_repository" {
   type        = string
   default     = "fhazdev/CodeJudge"
 }
+
+variable "github_subject_prefix" {
+  description = <<-EOT
+    The prefix of the OIDC subject claim GitHub actually presents, which is no longer
+    plain "repo:owner/name". GitHub embeds immutable numeric owner and repository ids,
+    so the real claim is "repo:owner@4829198/name@1338829441:ref:refs/heads/main".
+
+    A federated credential built from var.github_repository alone therefore never
+    matches, and every azure/login fails with AADSTS700213 pointing at a subject that
+    looks correct until you compare it character by character.
+
+    Read the current value for a repository with:
+      gh api repos/<owner>/<name>/actions/oidc/customization/sub --jq .sub_claim_prefix
+
+    Matching on the ids is the stronger position, not a workaround: they are immutable,
+    so a repository deleted and recreated under the same name gets a new id and cannot
+    assume this identity.
+  EOT
+  type        = string
+  default     = "repo:fhazdev@4829198/CodeJudge@1338829441"
+}
