@@ -29,7 +29,7 @@ resource "azuread_application_federated_identity_credential" "main_branch" {
   description    = "Pushes to the default branch, for terraform apply and deploys."
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
-  subject        = "repo:${var.github_repository}:ref:refs/heads/main"
+  subject        = "${var.github_subject_prefix}:ref:refs/heads/main"
 }
 
 resource "azuread_application_federated_identity_credential" "pull_request" {
@@ -40,5 +40,5 @@ resource "azuread_application_federated_identity_credential" "pull_request" {
   description    = "Pull requests, for terraform plan only."
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
-  subject        = "repo:${var.github_repository}:pull_request"
+  subject        = "${var.github_subject_prefix}:pull_request"
 }

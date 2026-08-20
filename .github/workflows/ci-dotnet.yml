@@ -97,6 +97,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The runner's default builder uses the plain `docker` driver, which cannot export
+      # a cache: `cache-to: type=gha` fails outright with "Cache export is not supported
+      # for the docker driver". This sets up a docker-container driver builder, which can.
+      # `load: true` below still works on that driver.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
       # Proves the image builds on every PR. Pushing to GHCR happens in cd-deploy,
       # only after a merge to main.
       - name: Build API image
