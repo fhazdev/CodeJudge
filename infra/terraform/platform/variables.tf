@@ -48,6 +48,30 @@ variable "judge_image" {
   default     = "mcr.microsoft.com/dotnet/samples:aspnetapp"
 }
 
+variable "key_vault_secrets_officer_object_ids" {
+  description = <<-EOT
+    Object ids of every principal that runs `terraform apply` and therefore needs
+    data-plane write access to the vault.
+
+    Owner on the subscription does not imply Key Vault data-plane access when the vault
+    uses RBAC authorization, which is why this grant has to exist at all. See the comment
+    on azurerm_role_assignment.deployer_secrets_officer for why it is an explicit list
+    rather than data.azurerm_client_config.current.object_id.
+
+    Look either up with:
+      az ad signed-in-user show --query id -o tsv
+      az ad sp show --id <cicd-app-client-id> --query id -o tsv
+  EOT
+  type        = set(string)
+  default = [
+    # Human operator, for local applies.
+    "7ccec34f-71b6-4d4b-bad9-bee536bdaf25",
+
+    # codejudge-cicd service principal, for applies from cd-infra.
+    "61046f3b-e29b-4da0-b7fe-f208aa979882",
+  ]
+}
+
 variable "neon_connection_string" {
   description = <<-EOT
     Npgsql connection string for the Neon database.

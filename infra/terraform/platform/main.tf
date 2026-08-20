@@ -125,11 +125,23 @@ resource "azurerm_key_vault" "main" {
   tags = local.tags
 }
 
-# Whoever runs the apply needs to be able to write the secret they are creating.
+# Whoever runs the apply needs to be able to write the secret they are creating, and
+# "whoever" is now more than one principal: a human locally and the CI service principal
+# on main.
+#
+# This deliberately does NOT use data.azurerm_client_config.current.object_id. That
+# resolves to whoever happens to be running, so a local apply and a CI apply each plan to
+# destroy the other's assignment, thrashing forever. Worse, CI cannot even refresh
+# azurerm_key_vault_secret below without a grant it does not yet hold, so the plan fails
+# with a 403 before it can create the grant that would have fixed it.
+#
+# Listing the principals explicitly keeps the set identical no matter who applies.
 resource "azurerm_role_assignment" "deployer_secrets_officer" {
+  for_each = var.key_vault_secrets_officer_object_ids
+
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = each.value
 }
 
 resource "azurerm_role_assignment" "workload_secrets_user" {
