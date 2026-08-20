@@ -46,6 +46,14 @@ resource "azuread_application" "api" {
       type = "Scope"
     }
   }
+
+  lifecycle {
+    # azuread_application_identifier_uri below owns this attribute. Without ignoring it
+    # here, the two resources fight: this one reads the URI the other one set as drift
+    # and removes it on every apply, which silently breaks both the audience the API
+    # validates and the scope the SPA requests.
+    ignore_changes = [identifier_uris]
+  }
 }
 
 # Separate resource because the URI contains the client id, which does not exist until

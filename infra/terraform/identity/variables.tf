@@ -23,7 +23,11 @@ variable "spa_redirect_uris" {
   EOT
   type        = list(string)
   default = [
-    "http://localhost:5173/"
+    "http://localhost:5173/",
+
+    # The Static Web App created by the platform module. MSAL derives its redirectUri
+    # from window.location.origin plus a slash, so this must match that exactly.
+    "https://lively-river-074d2f910.7.azurestaticapps.net/"
   ]
 }
 
@@ -32,10 +36,13 @@ variable "github_repository" {
     GitHub repository in "owner/name" form, used as the subject of the CI/CD
     federated credentials.
 
-    Empty means the CI/CD registration is not created at all. There is no remote yet,
-    and a federated credential pointing at a repository that does not exist would be
-    worse than absent.
+    Empty means the CI/CD registration is not created at all, which was the state before
+    the remote existed: a federated credential pointing at a repository that does not
+    exist looks configured while granting nothing.
+
+    Not a secret. The subject is public information, and the trust comes from the
+    federated credential matching it, not from the string being hidden.
   EOT
   type        = string
-  default     = ""
+  default     = "fhazdev/CodeJudge"
 }

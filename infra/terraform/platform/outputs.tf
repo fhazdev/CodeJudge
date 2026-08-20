@@ -12,6 +12,11 @@ output "api_container_app_name" {
   value       = azurerm_container_app.api.name
 }
 
+output "judge_container_app_job_name" {
+  description = "Target for `az containerapp job update` in cd-deploy."
+  value       = azurerm_container_app_job.judge.name
+}
+
 output "web_hostname" {
   description = "Add this, with an https:// prefix and a trailing slash, as a redirect URI on the SPA app registration."
   value       = azurerm_static_web_app.web.default_host_name

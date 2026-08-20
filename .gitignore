@@ -35,6 +35,12 @@ dist-ssr/
 *.tfstate.*
 *.tfplan
 crash.log
+
+# Variable files carry secrets by definition here: neon_connection_string is marked
+# sensitive and has no default. Ignored so a local apply cannot commit a live database
+# password. Prefer TF_VAR_neon_connection_string in the environment over a file.
+*.tfvars
+*.tfvars.json
 override.tf
 override.tf.json
 *_override.tf

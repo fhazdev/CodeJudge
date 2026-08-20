@@ -14,6 +14,10 @@
     original sketch: the CI/CD *app registration* is Terraform-managed in
     infra/terraform/identity, while only its *role assignment* lives here.
 
+    The state account is deliberately project-neutral and shared by every project in the
+    subscription. State files are separated by the backend's `key`, not by account, so a
+    second project runs this same script unchanged and only picks a different key.
+
     Idempotent. Safe to run repeatedly; existing resources are left alone.
 
 .EXAMPLE
@@ -21,16 +25,24 @@
 
 .EXAMPLE
     ./bootstrap.ps1 -CicdClientId 00000000-0000-0000-0000-000000000000
+
+.EXAMPLE
+    ./bootstrap.ps1 -Project someotherproject
 #>
 [CmdletBinding()]
 param(
-    [string] $Location = 'eastus2',
+    [string] $Location = 'centralus',
 
-    [string] $ResourceGroupName = 'rg-codejudge-tfstate',
+    # Names the state file, not the shared infrastructure. Everything this script creates
+    # is reused across projects; only the printed backend `key` changes with this.
+    [string] $Project = 'codejudge',
+
+    [string] $ResourceGroupName = 'rg-tfstate',
 
     # Storage account names are globally unique across all of Azure, 3 to 24 characters,
     # lowercase alphanumeric only. Left empty, a deterministic name is derived from the
     # subscription id so repeated runs agree without needing the value written down.
+    # Keyed on the subscription rather than the project, because one account serves them all.
     [string] $StorageAccountName = '',
 
     [string] $ContainerName = 'tfstate',
@@ -45,13 +57,41 @@ $ErrorActionPreference = 'Stop'
 function Write-Step { param([string] $Message) Write-Host "==> $Message" -ForegroundColor Cyan }
 function Write-Skip { param([string] $Message) Write-Host "    $Message" -ForegroundColor DarkGray }
 
+<#
+.SYNOPSIS
+    Runs an `az` existence check that is allowed to fail.
+.DESCRIPTION
+    Every "does this already exist?" probe here fails by design on a first run, and `az`
+    reports that by writing to stderr. Under Windows PowerShell 5.1 a native command
+    writing to stderr while $ErrorActionPreference is 'Stop' raises a terminating
+    NativeCommandError, so the probe throws instead of answering "no". PowerShell 7 does
+    not do this, which is exactly why it goes unnoticed until someone runs powershell.exe.
+
+    Returns $null when the resource is absent or the command failed, so callers can treat
+    the result as a plain boolean.
+#>
+function Invoke-AzProbe {
+    param([Parameter(Mandatory)][scriptblock] $Command)
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $Command 2>$null
+        if ($LASTEXITCODE -ne 0) { return $null }
+        return $output
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 # --- Preconditions ----------------------------------------------------------
 
 Write-Step 'Checking Azure CLI login'
-$account = az account show --output json 2>$null | ConvertFrom-Json
-if (-not $account) {
+$accountJson = Invoke-AzProbe { az account show --output json }
+if (-not $accountJson) {
     throw 'Not signed in to the Azure CLI. Run: az login'
 }
+$account = $accountJson | ConvertFrom-Json
 
 $subscriptionId = $account.id
 Write-Skip "subscription: $($account.name) ($subscriptionId)"
@@ -59,10 +99,18 @@ Write-Skip "tenant:       $($account.tenantId)"
 
 if ([string]::IsNullOrWhiteSpace($StorageAccountName)) {
     # Deterministic, so re-running produces the same name without storing it anywhere.
-    $hash = [System.Security.Cryptography.SHA256]::HashData(
-        [System.Text.Encoding]::UTF8.GetBytes($subscriptionId))
+    #
+    # ComputeHash on an instance rather than the static SHA256::HashData: the latter is
+    # .NET 5+, so it throws MethodNotFound under Windows PowerShell 5.1, which is still
+    # what `powershell.exe` launches on a stock Windows box.
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($subscriptionId))
+    } finally {
+        $sha256.Dispose()
+    }
     $suffix = -join ($hash[0..3] | ForEach-Object { $_.ToString('x2') })
-    $StorageAccountName = "stcjtfstate$suffix"
+    $StorageAccountName = "sttfstate$suffix"
 }
 
 Write-Skip "storage account: $StorageAccountName"
@@ -80,10 +128,12 @@ if ((az group exists --name $ResourceGroupName) -eq 'true') {
 # --- Storage account --------------------------------------------------------
 
 Write-Step "Storage account '$StorageAccountName'"
-$existing = az storage account show `
-    --name $StorageAccountName `
-    --resource-group $ResourceGroupName `
-    --output json 2>$null
+$existing = Invoke-AzProbe {
+    az storage account show `
+        --name $StorageAccountName `
+        --resource-group $ResourceGroupName `
+        --output json
+}
 
 if ($existing) {
     Write-Skip 'already exists'
@@ -114,12 +164,14 @@ if ($existing) {
 # --- State container --------------------------------------------------------
 
 Write-Step "Container '$ContainerName'"
-$containerExists = az storage container exists `
-    --name $ContainerName `
-    --account-name $StorageAccountName `
-    --auth-mode login `
-    --query exists `
-    --output tsv 2>$null
+$containerExists = Invoke-AzProbe {
+    az storage container exists `
+        --name $ContainerName `
+        --account-name $StorageAccountName `
+        --auth-mode login `
+        --query exists `
+        --output tsv
+}
 
 if ($containerExists -eq 'true') {
     Write-Skip 'already exists'
@@ -138,11 +190,13 @@ if (-not [string]::IsNullOrWhiteSpace($CicdClientId)) {
     Write-Step "Granting Contributor to CI/CD app $CicdClientId"
 
     $scope = "/subscriptions/$subscriptionId"
-    $assigned = az role assignment list `
-        --assignee $CicdClientId `
-        --role Contributor `
-        --scope $scope `
-        --output tsv 2>$null
+    $assigned = Invoke-AzProbe {
+        az role assignment list `
+            --assignee $CicdClientId `
+            --role Contributor `
+            --scope $scope `
+            --output tsv
+    }
 
     if ($assigned) {
         Write-Skip 'already assigned'
@@ -170,11 +224,14 @@ Write-Host @"
       resource_group_name  = "$ResourceGroupName"
       storage_account_name = "$StorageAccountName"
       container_name       = "$ContainerName"
-      key                  = "platform.tfstate"
+      key                  = "$Project-platform.tfstate"
     }
   }
 "@
 Write-Host ''
+Write-Host 'The key is what separates projects. This account is shared; use' -ForegroundColor Green
+Write-Host "  <project>-platform.tfstate  and  <project>-identity.tfstate"
+Write-Host ''
 Write-Host 'To migrate the identity module off local state:' -ForegroundColor Green
-Write-Host '  cd infra/terraform/identity && terraform init -migrate-state'
+Write-Host "  cd infra/terraform/identity && terraform init -migrate-state -backend-config=`"key=$Project-identity.tfstate`""
 Write-Host ''
